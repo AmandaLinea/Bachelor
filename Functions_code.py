@@ -3,12 +3,13 @@ import seaborn as sns
 import pandas as pd 
 import matplotlib.pyplot as plt
 import matplotlib.colors
+from PrismData import PrismParser, VariantData
 import numpy as np 
 import os
 from Bio import Align
 
-# A function to create heatmaps showing the change in thermodynamic stability (ddg or dddg) for a PDB ID
-# across all theoretic mutations across all positions in the sequence
+''' A function to create heatmaps showing the change in thermodynamic stability (ddg or dddg) for a PDB ID
+ across all theoretic mutations across all positions in the sequence'''
 def csv_to_two_heatmaps(csvfilepath, pdbid, valuecolumn, chainA=True, chainB=True, chainC=True, chainD=True, show_A =True, show_B=True, show_C=True, show_D=True):
     # Read the CSV file into a pandas dataframe
     df = pd.read_csv(f'{csvfilepath}')
@@ -61,15 +62,17 @@ def csv_to_two_heatmaps(csvfilepath, pdbid, valuecolumn, chainA=True, chainB=Tru
     if show_D==True:
         # Plot the heatmap for the PDB ID and chosen chains
         sns.heatmap(structure_D , vmin=-2 , vmax=12 , cmap='rainbow',ax=axs[1], yticklabels='auto', cbar_kws={'orientation':'horizontal'}).set_title(f'{valuecolumn} for PDB ID {pdbid} chain D')
+    
+    #Save the figure
     #plt.savefig(f"/content/output/Heatmap_for_{pdbid}_{valuecolumn}.png")
     plt.show()
     return fig
 
 
 
-# A function to create a histogram of the number of variants with the different changes in stability
+''' A function to create a histogram of the number of variants with the different changes in stability'''
 def csv_to_histogram(csvfilepath, pdbid, valuecolumn, minval, maxval, chainA=True, chainB=True, chainC=True, chainD=True):
-    # Read the CSV file
+    # Read the CSV file and get a dataframe with the wanted pdb and stability calculations
     df = pd.read_csv(csvfilepath)
     df = df[df['pdbid'] == pdbid] 
     df = df[df[valuecolumn].between(minval, maxval)]
@@ -104,12 +107,11 @@ def csv_to_histogram(csvfilepath, pdbid, valuecolumn, minval, maxval, chainA=Tru
 
     return plt.show()
 
-# functions used to get the utilized sequence for the protein or protein sequence
 
+'''functions used to get the utilized sequence for the protein or protein sequence'''
 def every_nth(list, nth):
     # Use list slicing to return elements starting from the (nth-1) index, with a step of 'nth'.
     return list[1::nth]
-
 def sequence_from_csv(csvfilepath, pdbid, chain): 
     ## Read the CSV file into a pandas dataframe
     #df = pd.read_csv(csvfilepath)
@@ -152,15 +154,18 @@ def sequence_from_csv(csvfilepath, pdbid, chain):
 
     return aa_list
 
-# This function flattens a nested list like [[0], [1], [2], [3], [4]] into just [0, 1, 2, 3, 4] 
+''' This function flattens a nested list like [[0], [1], [2], [3], [4]] into just [0, 1, 2, 3, 4] '''
 def flatten(list):
     return [x for xs in list for x in xs]
 
-# Converting the clinvar variant data into the same format as the RaSP csv file data
+''' Converting the clinvar variant data into the same format as the RaSP csv file data'''
 def variant_and_related_disease(clinvarcsvfile):
+    #read the CSV file into a dataframe
     df = pd.read_csv(clinvarcsvfile)
     df = df[[ "ref_aa", "pos_aa", "alt_aa", "ClinicalSignificance", "PhenotypeList",]]
     df = df.sort_values("pos_aa")
+
+    #replace all the three letter codes for aminoacids with one letter code
     df.replace("Ala", "A", inplace=True)
     df.replace("Arg", "R", inplace=True)
     df.replace("Asn", "N", inplace=True)
@@ -182,6 +187,7 @@ def variant_and_related_disease(clinvarcsvfile):
     df.replace("Tyr", "Y", inplace=True) 
     df.replace("Val", "V", inplace=True) 
     
+    #create a column for the variant
     df["variant"] = df["ref_aa"] + df["pos_aa"].astype(str) +df["alt_aa"]
     # If clinical significance and phenotype information is wanted as well, the hashtag can be removed from the next line
     #df = df[[ "variant" , "ClinicalSignificance", "PhenotypeList"]]
@@ -191,6 +197,7 @@ def variant_and_related_disease(clinvarcsvfile):
 
 # A function to spit out a list of the clinical pathogenic variants and their corresponding theoretical ddg or dddg
 def clinvar_csv_to_list_with_stability(clinvarpathogeniccsvpath, clinvarbenigncsvpath, RaSPdatacsvpath, pdbid):
+    #read csv file into dataframe
     df = pd.read_csv(RaSPdatacsvpath)
     df = df[df['pdbid'] == pdbid]
 
@@ -205,6 +212,7 @@ def clinvar_csv_to_list_with_stability(clinvarpathogeniccsvpath, clinvarbenigncs
     # Getting the clinvar variants as a list
     list1 = flatten(variant_and_related_disease(clinvarpathogeniccsvpath))
     list2 = flatten(variant_and_related_disease(clinvarbenigncsvpath))
+
 
     for word in list1:
         # Here we use list comprehension on the dataframe to filter for just the entries with our variants. This is almost instant 
@@ -234,10 +242,13 @@ def clinvar_csv_to_list_with_stability(clinvarpathogeniccsvpath, clinvarbenigncs
     for i in range(len(benign_variant)):
         benign_dict[benign_variant[i]] = (benign_ddg[i], benign_dddg[i])
     
+    #empty lists for the keys and values of the dictionaries
     pathkeys = []
     pathvalues = []
     benignkeys = []
     benignvalues = []
+
+    #appending keys and values to their rightful list, from the benign and pathogenic lists 
     for key, value in pathogenic_dict.items():
         if value[1] >= 0.1:
             pathkeys.append(key)
@@ -248,6 +259,7 @@ def clinvar_csv_to_list_with_stability(clinvarpathogeniccsvpath, clinvarbenigncs
             benignkeys.append(key)
             benignvalues.append(value)
 
+    #create a new dataframe based on the lists 
     dddg01 = pd.DataFrame({'Pathogenic variants': pathkeys, 'Pathogenic variant values' : pathvalues})
     dddgbenign01 = pd.DataFrame({'Benign variants': benignkeys, 'Benign variant values' : benignvalues})
     return print(f"The pathogenic variants of {pdbid} with dddg of more than 0.1: {dddg01} \nThe benign variants of {pdbid} with dddg of more than 0.1: {dddgbenign01}")
@@ -292,7 +304,6 @@ def clinvar_scatterplot_ddg_and_dddg(clinvarpathogeniccsvpath1, clinvarbenigncsv
                  benign_dddg1.append(row['score_ml_ddg_bind'])
     
     for word in list3:
-        # Here we use list comprehension on the dataframe to filter for just the entries with our variants. This is almost instant 
         filtered = df2[df2['variant']==word]
         for _, row in filtered.iterrows():
             if row['pdbid'] == pdbid2:
@@ -324,16 +335,19 @@ def clinvar_scatterplot_ddg_and_dddg(clinvarpathogeniccsvpath1, clinvarbenigncsv
     return figure
 
 def scatterplotting_old_and_new_predictions(oldcsv, oldpdbid, newcsv, newpdbid):
+    #read the old and new dataframes into their own respective dataframes
     dfgammel = pd.read_csv(oldcsv)
     dfgammel = dfgammel[dfgammel['pdbid'] == oldpdbid]
     dfny = pd.read_csv(newcsv)
     dfny = dfny[dfny['pdbid'] == newpdbid]
 
+    #create empty lists for the stability values to be found in each dataframe
     ddggammel = []
     ddgny = []
     dddggammel = []
     dddgny = []
 
+    #appending all the values from the old and new dataframes, into the lists, in the rightfull order
     for row in dfgammel['score_ml']:
         ddggammel.append(row)
     
@@ -346,6 +360,7 @@ def scatterplotting_old_and_new_predictions(oldcsv, oldpdbid, newcsv, newpdbid):
     for row in dfny['score_ml_ddg_bind']:
         dddgny.append(row)
     
+    #Plot the scatterplot
     figure = plt.figure(figsize = [8,8])
     plt.scatter(ddggammel, dddggammel, label=f'Original RaSP data for {oldpdbid}', color='red',  alpha=0.7)
     plt.scatter(ddgny, dddgny, label=f'New RaSP data for {newpdbid}', color='purple', alpha=0.7)
@@ -371,12 +386,11 @@ def scatterplotting_old_vs_new_ddg_predictions(gammelcsv, gammelpdbid, nycsv, ny
     score_ml_gammel = matching_rows['score_ml_old']
     score_ml_ny = matching_rows['score_ml_new']
 
+    # Step 3: Create scatterplot using Seaborn
     cmap_blended = sns.blend_palette(["#AA61E2", "#40E0D0", "#BADA55", "#FFD700","#F46049" ], as_cmap=True)
     sns.set_theme(style="darkgrid", font="Tahoma")
-
-    # Step 3: Create scatterplot using Seaborn
     plt.figure(figsize=(8, 6))
-    sns.scatterplot(x=score_ml_gammel, y=score_ml_ny, palette=cmap_blended, hue=matching_rows['score_ml_old'])
+    sns.scatterplot(x=score_ml_gammel, y=score_ml_ny, palette=cmap_blended, hue=matching_rows['score_ml_old'], legend=None)
 
     # Step 4: Fit a linear regression model using numpy
     slope, intercept = np.polyfit(score_ml_gammel, score_ml_ny, 1)
@@ -388,10 +402,10 @@ def scatterplotting_old_vs_new_ddg_predictions(gammelcsv, gammelpdbid, nycsv, ny
     r_value = np.corrcoef(score_ml_gammel, score_ml_ny)[0, 1]
     plt.text(0.7, 0.1, f'R = {r_value:.2f}', transform=plt.gca().transAxes, fontsize=17)
 
-    plt.xlabel(f'Old RaSP data for {gammelpdbid}', fontsize=17)
-    plt.ylabel(f'New RaSP data for {nypdbid}', fontsize=17)
-    plt.title(f'Old {gammelpdbid} DDG values against new {nypdbid} DDG values', fontsize=18)
-    plt.legend()
+    plt.xlabel(f'RaSP-PC data', fontsize=17)
+    plt.ylabel(f'RaSP-PCAV data', fontsize=17)
+    #plt.title(f'Old {gammelpdbid} DDG values against new {nypdbid} DDG values', fontsize=18)
+    #plt.legend()
     plt.show()
 
 
@@ -410,12 +424,12 @@ def scatterplotting_old_vs_new_dddg_predictions(gammelcsv, gammelpdbid, nycsv, n
     score_ml_ddg_bind_ny = matching_rows['score_ml_ddg_bind_new']
 
     
-    cmap_blended = sns.blend_palette(["#AA61E2", "#40E0D0", "#BADA55", "#FFD700","#F46049" ], as_cmap=True)
-    sns.set_theme(style="darkgrid", font="Tahoma")
 
     # Step 3: Create scatterplot using Seaborn
+    cmap_blended = sns.blend_palette(["#AA61E2", "#40E0D0", "#BADA55", "#FFD700","#F46049" ], as_cmap=True)
+    sns.set_theme(style="darkgrid", font="Tahoma")
     plt.figure(figsize=(8, 6))
-    sns.scatterplot(x=score_ml_ddg_bind_gammel, y=score_ml_ddg_bind_ny, palette=cmap_blended, hue=matching_rows['score_ml_ddg_bind_old'])
+    sns.scatterplot(x=score_ml_ddg_bind_gammel, y=score_ml_ddg_bind_ny, palette=cmap_blended, hue=matching_rows['score_ml_ddg_bind_old'], legend=None)
 
     # Step 4: Fit a linear regression model using numpy
     slope, intercept = np.polyfit(score_ml_ddg_bind_gammel, score_ml_ddg_bind_ny, 1)
@@ -427,18 +441,18 @@ def scatterplotting_old_vs_new_dddg_predictions(gammelcsv, gammelpdbid, nycsv, n
     r_value = np.corrcoef(score_ml_ddg_bind_gammel, score_ml_ddg_bind_ny)[0, 1]
     plt.text(0.7, 0.1, f'R = {r_value:.2f}', transform=plt.gca().transAxes, fontsize=17)
 
-    plt.xlabel(f'Old RaSP data for {gammelpdbid}', fontsize=17)
-    plt.ylabel(f'New RaSP data for {nypdbid}', fontsize=17)
-    plt.title(f'Old {gammelpdbid} DDDG values against new {nypdbid} DDDG values', fontsize=18)
-    plt.legend()
-    plt.show()  
-
+    plt.xlabel(f'RaSP-PC data ', fontsize=17)
+    plt.ylabel(f'RaSP-PCAV data ', fontsize=17)
+    #plt.title(f'Old {gammelpdbid} DDDG values against new {nypdbid} DDDG values', fontsize=18)
+    #plt.legend()
+    plt.show()    
+    
 
 def gathering_all_csv_files_into_one(folderpath,newname):
-    
+    #Get all files from a specific folder into one list
     all_files = os.listdir(folderpath)
     
-    # Filter out non-CSV files
+    # Filter out non-CSV files from the read folder
     csv_files = [f for f in all_files if f.endswith('.csv')]
     
     # Create a list to hold the dataframes
@@ -462,6 +476,7 @@ def gathering_all_csv_files_into_one(folderpath,newname):
     
     # Concatenate all data into one DataFrame
     big_df = pd.concat(df_list, ignore_index=True)
+
     # Drop duplicate variants (keep only the first occurrence)
     big_df.drop_duplicates(subset=('pdbid','chainid','variant'), inplace=True)
     
@@ -484,167 +499,366 @@ def remove_wildtype_from_csv(csvfile, name):
     df.to_csv(f"clean_{name}.csv", index=False)
 
 def sequence_from_nicolas(csvfile, uniprotnr):
+    #read the csv file into a dataframe
     df = pd.read_csv(csvfile)
     df = df[df['uniprot']== uniprotnr]
+    #get the second column of the file since it contains the entire sequence
     sequence = df['sequence'].iloc[2]
     return sequence 
 
-def align_data():
-    ''' i need to align my sequences to the sequences of Nicolas' datasheet.
-     to do this i will have to extract the sequence from my RaSP dataframe, i will do this using the sequence_from_csv() funtion
-     i will then have to extract the sequence from Nicolas' datasheet, which i can do by just extracting the first sequence of a 
-     uniprot-id, using the sequence_from_nicolas function. The sequences of the rightfull protein chains should then be aligned, 
-     and i am gonna use Biopythons module pairwise2 to do a global pairwise alignment. From then it is then necessary to fix any 
-     numbering of the mutants that could have been changed by this alignment. '''
+
+def write_prismfile_from_RaSP_csv():
+    #read csv into dataframe, and pick the chosen columns of the dataframe
+    df = pd.read_csv(f"predictions\All_new_df_ml.csv" )
+    dfb = df[df['pdbid']=='2C9S']
+    dfb = dfb[dfb['chainid']=='F']
+    dfb.reset_index(inplace=True)
+    dfb = dfb[['variant', 'score_ml', 'score_ml_ddg_bind']]
+
+    #write the meta data for the prism file
+    md = {'version':1,
+                'protein':{'name':'Human SUPEROXIDE DISMUTASE', 'organism':'Homo sapiens', 'uniprot':'P00441','first_residue_number':1, 'sequence':'ATKAVCVLKGDGPVQGIINFEQKESNGPVKVWGSIKGLTEGLHGFHVHEFGDNTAGCTSAGPHFNPLSRKHGGPKDEERHVGDLGNVTADKDGVADVSIEDSVISLSGDHCIIGRTLVVHEKADDLGKGGNEESTKTGNAGSRLACGVIGIAQ'},
+                'method':{'name':'RaSP from a PDB'},
+                'columns':{'score_ml':'DDG', 'score_ml_ddg_bind': 'DDDG'}}
+
+    #Call the use of the VariantData module in prismdata 
+    prismdata=VariantData(metadata=md, dataframe=dfb)
+    prismdata.check()
+
+    #parse and align the data
+    pp = PrismParser()
+    #write the prismfile into a directory with prism, the method behind the data and the uniprot ID 
+    pp.write("Prismfiles/prism_RaSP_P00441_F.txt", prismdata)
+
+
+
+def write_prismfile_from_Nicolas_csv():
+    #read csv into dataframe, and pick the chosen columns of the dataframe
+    df = pd.read_csv(f'nr2_Nicolas_data.csv')
+    dfa = df[df['uniprot'] =='P16410']
+    dfa.reset_index(inplace=True)
+    dfa = dfa[["variant", "clinvar_signifiance"]]
+
+    #write the meta data for the prism file
+    md = {'version':1,
+                'protein':{'name':'Human CYTOTOXIC T-LYMPHOCYTE-ASSOCIATED PROTEIN 4', 'organism':'Homo sapiens', 'uniprot':'P16410','first_residue_number':1, 'sequence':'MACLGFQRHKAQLNLATRTWPCTLLFFLLFIPVFCKAMHVAQPAVVLASSRGIASFVCEYASPGKATEVRVTVLRQADSQVTEVCAATYMMGNELTFLDDSICTGTSSGNQVNLTIQGLRAMDTGLYICKVELMYPPPYYLGIGNGTQIYVIDPEPCPDSDFLLWILAAVSSGLFFYSFLLTAVSLSKMLKKRSPLTTGVYVKMPPTEPECEKQFQPYFIPIN'},
+                'method':{'name':'RaSP from a PDB'},
+                'columns':{'clinvar_signifiance':'Clinical_significance'}}
+
+    #Call the use of the VariantData module in prismdata
+    prismdata=VariantData(metadata=md, dataframe=dfa)
+    prismdata.check()
+
+    #parse and align the data
+    pp = PrismParser()
+    #write the prismfile into a directory with prism, the method behind the data and the uniprot ID
+    pp.write("Prismfiles/prism_Nicolas_CTLA4_001.txt", prismdata)
+
+def read_prismfiles_into_dataframe():
+    # Read data section
+    dataframe1 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_O95786.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe1.insert(0, 'uniprot', 'O95786')
+    dataframe1['q_structure'] = 'Heterotetramer'
+
+    dataframe2 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P00439.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe2.insert(0, 'uniprot', 'P00439')
+    dataframe2['q_structure'] = 'Homotetramer'
+
+
+    dataframe3 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P00441.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe3.insert(0, 'uniprot', 'P00441')
+    dataframe3['q_structure'] = 'Homodimer'
+
+
+    dataframe4 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P16410.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe4.insert(0, 'uniprot', 'P16410')
+    dataframe4['q_structure'] = 'Heterotetramer'
+
+
+    dataframe5 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P30566.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe5.insert(0, 'uniprot', 'P30566')
+    dataframe5['q_structure'] = 'Homotetramer'
+
+
+    dataframe6 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P31371.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe6.insert(0, 'uniprot', 'P31371')
+    dataframe6['q_structure'] = 'Homotetramer'
+
+    dataframe7 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P35520.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe7.insert(0, 'uniprot', 'P35520')
+    dataframe7['q_structure'] = 'Homodimer'
+
+
+    dataframe8 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P42081.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe8.insert(0, 'uniprot', 'P42081')
+    dataframe8['q_structure'] = 'Heterotetramer'
+
+
+    dataframe9 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P43246.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe9.insert(0, 'uniprot', 'P43246')
+    dataframe9['q_structure'] = 'Heterodimer'
+
+    dataframe10 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P45381.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe10.insert(0, 'uniprot', 'P45381')
+    dataframe10['q_structure'] = 'Homodimer'
+
+
+    dataframe11 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P52701.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe11.insert(0, 'uniprot', 'P52701')
+    dataframe11['q_structure'] = 'Heterodimer'
+
+
+    dataframe12 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_P62826.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe12.insert(0, 'uniprot', 'P62826')
+    dataframe12['q_structure'] = 'Heterodimer'
+
+
+    dataframe13 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_Q8IUD6.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe13.insert(0, 'uniprot', 'Q8IUD6')
+    dataframe13['q_structure'] = 'Heterotetramer'
+
+
+    dataframe14 = pd.read_csv('Prismfiles\prism_Nicolas_RaSP_Q9Y5L0.txt', delim_whitespace=True, comment='#', header=0,
+                         keep_default_na=True, na_values=['Na','na'])
+    dataframe14.insert(0, 'uniprot', 'Q9Y5L0')
+    dataframe14['q_structure'] = 'Heterodimer'
+
+    #concatenate the data into one dataframe
+    big_dataframe = pd.concat([dataframe1,dataframe2,dataframe3,dataframe4,dataframe5,dataframe6,dataframe7,dataframe8,dataframe9,dataframe10,dataframe11,dataframe12,dataframe13,dataframe14], ignore_index=True)
+    #get the dataframe as a csv file
+    big_dataframe.to_csv('big_dataframe.csv', index=False)
+
+    return big_dataframe
+
+
+def big_dataframe_to_significant_dataframe():
+    df = pd.read_csv('big_dataframe.csv', index_col=0)
+    df.reset_index(drop=True)
+    dfa = df[df['clinvar_signifiance_00'].notnull()]
+    dfa.reset_index(inplace=True)
     
-    # my PDB file chain sequences
-    opah_a = sequence_from_csv(f'clean_df_ml_all.csv', 'OPAH_A')
-    opah_b = sequence_from_csv(f'clean_df_ml_all.csv', 'OPAH_B')
-    opah_c = sequence_from_csv(f'clean_df_ml_all.csv', 'OPAH_C')
-    opah_d = sequence_from_csv(f'clean_df_ml_all.csv', 'OPAH_D')
-    TOo8b_a = sequence_from_csv(f'clean_df_ml_all.csv', '2O8B_A')
-    TOo8b_b = sequence_from_csv(f'clean_df_ml_all.csv', '2O8B_B')
-    TOdn1_a = sequence_from_csv(f'clean_df_ml_all.csv', '2DN1_A')
-    TOdn1_b = sequence_from_csv(f'clean_df_ml_all.csv', '2DN1_B')
-    TOo4h_a = sequence_from_csv(f'clean_df_ml_all.csv', '2O4H_A')
-    TOo4h_b = sequence_from_csv(f'clean_df_ml_all.csv', '2O4H_B')
-    FIREol0_a = sequence_from_csv(f'clean_df_ml_all.csv', '4OL0_A')
-    FIREol0_b = sequence_from_csv(f'clean_df_ml_all.csv', '4OL0_B')
-    OTTEg7v_a = sequence_from_csv(f'clean_df_ml_all.csv', '8G7V_A')
-    OTTEg7v_b = sequence_from_csv(f'clean_df_ml_all.csv', '8G7V_B')
-    OTTEg7v_c = sequence_from_csv(f'clean_df_ml_all.csv', '8G7V_C')
-    OTTEg7v_d = sequence_from_csv(f'clean_df_ml_all.csv', '8G7V_D')
-    ETg82_a = sequence_from_csv(f'clean_df_ml_all.csv', '1G82_A')
-    ETg82_b = sequence_from_csv(f'clean_df_ml_all.csv', '1G82_B')
-    ETg82_c = sequence_from_csv(f'clean_df_ml_all.csv', '1G82_C')
-    ETg82_d = sequence_from_csv(f'clean_df_ml_all.csv', '1G82_D')
-    ETi85_a = sequence_from_csv(f'clean_df_ml_all.csv', '1I85_A')
-    ETi85_b = sequence_from_csv(f'clean_df_ml_all.csv', '1I85_B')
-    ETi85_c = sequence_from_csv(f'clean_df_ml_all.csv', '1I85_C')
-    ETi85_d = sequence_from_csv(f'clean_df_ml_all.csv', '1I85_D')
+    # Calculate the average for 'score_ml' columns
+    dfa['score_ml'] = dfa[['score_ml_01', 'score_ml_02', 'score_ml_03', 'score_ml_04']].mean(axis=1)
 
-    # my uniprot number chain sequences
-    P00439 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P00439')
-    P43246 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P43246')
-    P52701 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P52701')
-    P69905 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P69905')
-    P68871 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P68871')
-    P45381 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P45381')
-    Q9Y5L0 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'Q9Y5L0')
-    P62826 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P62826')
-    O95786 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'O95786')
-    Q8IUD6 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'Q8IUD6')
-    P31371 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P31371')
-    P16410 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P16410')
-    P42081 = sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'P42081')
+    # Calculate the average for 'score_ml_ddg_bind' columns
+    dfa['score_ml_ddg_bind'] = dfa[['score_ml_ddg_bind_01', 'score_ml_ddg_bind_02', 'score_ml_ddg_bind_03', 'score_ml_ddg_bind_04']].mean(axis=1)
 
-    # Create a PairwiseAligner object
-    aligner = Align.PairwiseAligner()
+    # Calculate the standard deviation for 'score_ml' and 'score_ml_ddg_bind'
+    dfa['std_score_ml'] = dfa[['score_ml_01', 'score_ml_02', 'score_ml_03', 'score_ml_04']].std(axis=1)
+    dfa['std_score_ml_ddg_bind'] = dfa[['score_ml_ddg_bind_01', 'score_ml_ddg_bind_02', 'score_ml_ddg_bind_03', 'score_ml_ddg_bind_04']].std(axis=1)
+    
+    # Calculate the average for 'score_ml' columns
+    dfa['score_ml_max'] = dfa[['score_ml_01', 'score_ml_02', 'score_ml_03', 'score_ml_04']].max(axis=1)
 
-    # Perform pairwise alignment
-    def pairwise_align(seq1, seq2):
-        alignment = aligner.align(seq1, seq2)
-        best_alignment = max(alignment, key=lambda x: x.score)
-        return best_alignment
+    # Calculate the average for 'score_ml_ddg_bind' columns
+    dfa['score_ml_ddg_bind_max'] = dfa[['score_ml_ddg_bind_01', 'score_ml_ddg_bind_02', 'score_ml_ddg_bind_03', 'score_ml_ddg_bind_04']].max(axis=1)
 
-    # Create a dataframe to store the results
-    #df = pd.DataFrame(columns=["pdbid", "uniprot", "alignment_score"])
-    columns =  ["pdbid", "uniprot", "alignment_score"]
-    results = []
+    #make a new dataframe based on the columns that explain what we want to show
+    significant_dataframe=dfa[['uniprot','variant','clinvar_signifiance_00','q_structure','score_ml','score_ml_ddg_bind','std_score_ml','std_score_ml_ddg_bind', 'score_ml_max' ,'score_ml_ddg_bind_max']]
 
-    # Example: Align opah_a with P00439
-    alignment1 = pairwise_align(opah_a, P00439)
-    results.append({"pdbid": "OPAH_A", "uniprot": "P00439", "alignment_score": alignment1.score})
-    alignment2 = pairwise_align(opah_b, P00439)
-    results.append({"pdbid": "OPAH_B", "uniprot": "P00439", "alignment_score": alignment2.score})
-    alignment3 = pairwise_align(opah_c, P00439)
-    results.append({"pdbid": "OPAH_C", "uniprot": "P00439", "alignment_score": alignment3.score})
-    alignment4 = pairwise_align(opah_d, P00439)
-    results.append({"pdbid": "OPAH_D", "uniprot": "P00439", "alignment_score": alignment4.score})
-
-    alignment5 = pairwise_align(TOo8b_a, P43246)
-    results.append({"pdbid": "2O8B_A", "uniprot": "P43246", "alignment_score": alignment5.score})
-    alignment6 = pairwise_align(TOo8b_b, P52701)
-    results.append({"pdbid": "2O8B_B", "uniprot": "P52701", "alignment_score": alignment6.score})
-    alignment7 = pairwise_align(TOo8b_a, P52701)
-    results.append({"pdbid": "2O8B_A", "uniprot": "P52701", "alignment_score": alignment7.score})
-    alignment8 = pairwise_align(TOo8b_b, P43246 )
-    results.append({"pdbid": "2O8B_B", "uniprot": "P43246 ", "alignment_score": alignment8.score})
-
-    alignment9 = pairwise_align(TOdn1_a, P69905)
-    results.append({"pdbid": "2DN1_A", "uniprot": "P69905", "alignment_score": alignment9.score})
-    alignment10 = pairwise_align(TOdn1_b, P68871)
-    results.append({"pdbid": "2DN1_B", "uniprot": "P68871", "alignment_score": alignment10.score})
-    alignment11 = pairwise_align(TOdn1_a, P68871)
-    results.append({"pdbid": "2DN1_A", "uniprot": "P68871", "alignment_score": alignment11.score})
-    alignment12 = pairwise_align(TOdn1_b, P69905)
-    results.append({"pdbid": "2DN1_B", "uniprot": "P69905", "alignment_score": alignment12.score})
-
-    alignment13 = pairwise_align(TOo4h_a, P45381)
-    results.append({"pdbid": "2O4H_A", "uniprot": "P45381", "alignment_score": alignment13.score})
-    alignment14 = pairwise_align(TOo4h_b, P45381)
-    results.append({"pdbid": "2O4H_B", "uniprot": "P45381", "alignment_score": alignment14.score})
-
-    alignment15 = pairwise_align(FIREol0_a, Q9Y5L0)
-    results.append({"pdbid": "4OL0_A", "uniprot": "Q9Y5L0", "alignment_score": alignment15.score})
-    alignment16 = pairwise_align(FIREol0_b, P62826)
-    results.append({"pdbid": "4OL0_B", "uniprot": "P62826", "alignment_score": alignment16.score})
-    alignment17 = pairwise_align(FIREol0_a, P62826)
-    results.append({"pdbid": "4OL0_A", "uniprot": "P62826", "alignment_score": alignment17.score})
-    alignment18 = pairwise_align(FIREol0_b, Q9Y5L0)
-    results.append({"pdbid": "4OL0_B", "uniprot": "Q9Y5L0", "alignment_score": alignment18.score})
-
-    alignment19 = pairwise_align(OTTEg7v_a, O95786)
-    results.append({"pdbid": "8G7V_A", "uniprot": "O95786", "alignment_score": alignment19.score})
-    alignment20 = pairwise_align(OTTEg7v_b, Q8IUD6)
-    results.append({"pdbid": "8G7V_B", "uniprot": "Q8IUD6", "alignment_score": alignment20.score})
-    alignment21 = pairwise_align(OTTEg7v_c, O95786)
-    results.append({"pdbid": "8G7V_C", "uniprot": "O95786", "alignment_score": alignment21.score})
-    alignment22 = pairwise_align(OTTEg7v_d, Q8IUD6)
-    results.append({"pdbid": "8G7V_D", "uniprot": "Q8IUD6", "alignment_score": alignment22.score})
-    alignment23 = pairwise_align(OTTEg7v_a, Q8IUD6)
-    results.append({"pdbid": "8G7V_A", "uniprot": "Q8IUD6", "alignment_score": alignment23.score})
-    alignment24 = pairwise_align(OTTEg7v_b, O95786)
-    results.append({"pdbid": "8G7V_B", "uniprot": "O95786", "alignment_score": alignment24.score})
-    alignment25 = pairwise_align(OTTEg7v_c, Q8IUD6)
-    results.append({"pdbid": "8G7V_C", "uniprot": "Q8IUD6", "alignment_score": alignment25.score})
-    alignment26 = pairwise_align(OTTEg7v_d, O95786)
-    results.append({"pdbid": "8G7V_D", "uniprot": "O95786", "alignment_score": alignment26.score})
-
-    alignment27 = pairwise_align(ETg82_a, P31371)
-    results.append({"pdbid": "1G82_A", "uniprot": "P31371", "alignment_score": alignment27.score})
-    alignment28 = pairwise_align(ETg82_b, P31371)
-    results.append({"pdbid": "1G82_B", "uniprot": "P31371", "alignment_score": alignment28.score})
-    alignment29 = pairwise_align(ETg82_c, P31371)
-    results.append({"pdbid": "1G82_C", "uniprot": "P31371", "alignment_score": alignment29.score})
-    alignment30 = pairwise_align(ETg82_d, P31371)
-    results.append({"pdbid": "1G82_D", "uniprot": "P31371", "alignment_score": alignment30.score})
-
-    alignment31 = pairwise_align(ETi85_a, P16410)
-    results.append({"pdbid": "1I85_A", "uniprot": "P16410", "alignment_score": alignment31.score})
-    alignment32 = pairwise_align(ETi85_b, P42081)
-    results.append({"pdbid": "1I85_B", "uniprot": "P42081", "alignment_score": alignment32.score})
-    alignment33 = pairwise_align(ETi85_c, P16410)
-    results.append({"pdbid": "1I85_C", "uniprot": "P16410", "alignment_score": alignment33.score})
-    alignment34 = pairwise_align(ETi85_d, P42081)
-    results.append({"pdbid": "1I85_D", "uniprot": "P42081", "alignment_score": alignment34.score})
-    alignment35 = pairwise_align(ETi85_a, P42081)
-    results.append({"pdbid": "1I85_A", "uniprot": "P42081", "alignment_score": alignment35.score})
-    alignment36 = pairwise_align(ETi85_b, P16410)
-    results.append({"pdbid": "1I85_B", "uniprot": "P16410", "alignment_score": alignment36.score})
-    alignment37 = pairwise_align(ETi85_c, P42081)
-    results.append({"pdbid": "1I85_C", "uniprot": "P42081", "alignment_score": alignment37.score})
-    alignment38 = pairwise_align(ETi85_d, P16410)
-    results.append({"pdbid": "1I85_D", "uniprot": "P16410", "alignment_score": alignment38.score})
-
-    # Create the dataframe
-    alignment_df = pd.DataFrame(results)
-
-    # Save to CSV or any other format you prefer
-    alignment_df.to_csv("pairwise_alignments.csv", index=False)
-    return print(alignment_df)
+    #save the new dataframe to a csv file
+    significant_dataframe.to_csv('significant_dataframe_2.csv', index=False)
+    return significant_dataframe
 
 
+def scatterplot_marginals_quadrant_for_significant_dataframe(ddg_cutoff,dddg_cutoff):
+    df = pd.read_csv('significant_dataframe.csv')
+    df = df[df['clinvar_signifiance_00']!='VUS']
+    df = df[df['score_ml'].notnull()]
+    df.reset_index(inplace=True)
+    
+    # Create quadrants based on x and y values
+    df["quadrant"] = ""
+    df.loc[(df["score_ml"] < ddg_cutoff) & (df["score_ml_ddg_bind"] >= dddg_cutoff), "quadrant"] = "I"
+    df.loc[(df["score_ml"] >= ddg_cutoff) & (df["score_ml_ddg_bind"] >= dddg_cutoff), "quadrant"] = "II"
+    df.loc[(df["score_ml"] < ddg_cutoff) & (df["score_ml_ddg_bind"] < dddg_cutoff), "quadrant"] = "III"
+    df.loc[(df["score_ml"] >= ddg_cutoff) & (df["score_ml_ddg_bind"] < dddg_cutoff), "quadrant"] = "IV"
+
+    #make specific clinical significances into their own variable
+    dfpath = df[df["clinvar_signifiance_00"]=='pathogenic']
+    dfbenign = df[df["clinvar_signifiance_00"]=='benign']
+    #dfVUS = df[df["clinvar_signifiance_00"]=='VUS']
+    dfconflict = df[df["clinvar_signifiance_00"]=='conflict']
+
+    #get the values from the rows in every quadrant
+    all_I = df["quadrant"].value_counts()["I"]
+    path_I = dfpath[dfpath["quadrant"]== "I"]
+    benign_I = dfbenign[dfbenign["quadrant"]=="I"]
+    #vUS_I = dfVUS[dfVUS["quadrant"]== "I"]
+    conflict_I = dfconflict[dfconflict["quadrant"]== "I"]
+
+    all_II = df["quadrant"].value_counts()["II"]
+    path_II = dfpath[dfpath["quadrant"]=="II"]
+    benign_II = dfbenign[dfbenign["quadrant"]== "II"]
+    #vUS_II = dfVUS[dfVUS["quadrant"]== "II"]
+    conflict_II = dfconflict[dfconflict["quadrant"]== "II"]
+
+    all_III = df["quadrant"].value_counts()["III"]
+    path_III = dfpath[dfpath["quadrant"]=="III"]
+    benign_III = dfbenign[dfbenign["quadrant"]=="III"]
+    #vUS_III = dfVUS[dfVUS["quadrant"]== "III"]
+    conflict_III = dfconflict[dfconflict["quadrant"]== "III"]
+
+    all_IV = df["quadrant"].value_counts()["IV"]
+    path_IV = dfpath[dfpath["quadrant"]=="IV"]
+    benign_IV = dfbenign[dfbenign["quadrant"]=="IV"]
+    #vUS_IV = dfVUS[dfVUS["quadrant"]== "IV"]
+    conflict_IV = dfconflict[dfconflict["quadrant"]== "IV"]
+
+    all = len(df["quadrant"])
+    path_all = len(dfpath)
+    benign_all = len(dfbenign)
+    #VUS_all = len(dfVUS)
+    conflict_all = len(dfconflict)
+
+    # Create the Seaborn jointplot
+    #sns.color_palette("Spectral", as_cmap=True)
+    #markers = {"Homodimer": "^", "Homotetramer": "v", "Heterodimer":">", "Heterotetramer":"<"}
+    #sns.set_theme(style="darkgrid", palette="gist_ncar_r", font="Tahoma")
+    palette = ["#AA61E2", "#FFD700","#F46049", "#40E0D0",  "#BADA55"]
+    sns.set_palette(palette)
+    sns.set_theme(style="darkgrid", palette=palette, font="Tahoma", )
+    #g = sns.jointplot(data=df, x="score_ml", y="score_ml_ddg_bind", hue="clinvar_signifiance_00", alpha=.5, space=.8)
+    g = sns.jointplot(data=df, x="score_ml", y="score_ml_ddg_bind", hue="q_structure", alpha=.5, space=.8 )
+    g.refline(x=ddg_cutoff, y=dddg_cutoff, marginal=False)
+    g.figure.subplots_adjust(top=.9)
+    #sns.move_legend(g.ax_joint, "upper center", bbox_to_anchor=(.5, 1.1), ncol=3, title="Clinical significance", fontsize=12)
+    sns.move_legend(g.ax_joint, "upper center", bbox_to_anchor=(.5, 1.1), ncol=4, title="Quaternary structure", fontsize=12)
+    #g.figure.suptitle(f'Figure 11: Scatterplot with marginals, showing the distribution of clinical variants\n across mean \u0394\u0394G and mean \u0394\u0394\u0394G values')
+    g.figure.suptitle(f'Figure 12: Scatterplot with marginals, showing the distribution of clinical variants´ quaternary structure\n across mean \u0394\u0394G and mean \u0394\u0394\u0394G values')
+    plt.text(-4,2, f"I \nDots: {all_I}/{all}={round((all_I/all)*100, 2)}%\nPathogenic: {len(path_I)}/{path_all}={round((len(path_I)/path_all)*100, 2)}%\nBenign: {len(benign_I)}/{benign_all}={round((len(benign_I)/benign_all)*100, 2)}%\nConflicting: {len(conflict_I)}/{conflict_all}={round((len(conflict_I)/conflict_all)*100, 2)}%", fontsize=11)
+    plt.text(9.5,2, f"II \nDots: {all_II}/{all}={round((all_II/all)*100,2)}%\nPathogenic: {len(path_II)}/{path_all}={round((len(path_II)/path_all)*100,2)}%\nBenign: {len(benign_II)}/{benign_all}={round((len(benign_II)/benign_all)*100, 2)}%\nConflicting: {len(conflict_II)}/{conflict_all}={round((len(conflict_II)/conflict_all)*100, 2)}%",fontsize=11)
+    plt.text(-4,-1, f"III \nDots: {all_III}/{all}={round((all_III/all)*100, 2)}%\nPathogenic: {len(path_III)}/{path_all}={round((len(path_III)/path_all)*100,2)}%\nBenign: {len(benign_III)}/{benign_all}={round((len(benign_III)/benign_all)*100,2)}%\nConflicting: {len(conflict_III)}/{conflict_all}={round((len(conflict_III)/conflict_all)*100, 2)}%",fontsize=11) 
+    plt.text(9.5,-1, f"IV \nDots: {all_IV}/{all}={round((all_IV/all)*100,2)}%\nPathogenic: {len(path_IV)}/{path_all}={round((len(path_IV)/path_all)*100,2)}%\nBenign: {len(benign_IV)}/{benign_all}={round((len(benign_IV)/benign_all)*100,2)}%\nConflicting: {len(conflict_IV)}/{conflict_all}={round((len(conflict_IV)/conflict_all)*100, 2)}%",fontsize=11)
+    #plt.text(-3.5,2, f"I \nDots: {all_I}/{all}={round(all_I/all, 3)}\nPathogenic: {len(path_I)}/{path_all}={round(len(path_I)/path_all, 3)}\nBenign: {len(benign_I)}/{benign_all}={round(len(benign_I)/benign_all, 3)}\nConflicting: {len(conflict_I)}/{conflict_all}={round(len(conflict_I)/conflict_all, 3)} \nVUS: {len(vUS_I)}/{VUS_all}={round(len(vUS_I)/VUS_all, 3)}")
+    #plt.text(9.5,2, f"II \nDots: {all_II}/{all}={round(all_II/all,3)}\nPathogenic: {len(path_II)}/{path_all}={round(len(path_II)/path_all,3)}\nBenign: {len(benign_II)}/{benign_all}={round(len(benign_II)/benign_all, 3)}\nConflicting: {len(conflict_II)}/{conflict_all}={round(len(conflict_II)/conflict_all, 3)} \nVUS: {len(vUS_II)}/{VUS_all}={round(len(vUS_II)/VUS_all, 3)}")
+    #plt.text(-3.5,-0.5, f"III \nDots: {all_III}/{all}={round(all_III/all, 3)}\nPathogenic: {len(path_III)}/{path_all}={round(len(path_III)/path_all,3)}\nBenign: {len(benign_III)}/{benign_all}={round(len(benign_III)/benign_all,3)}\nConflicting: {len(conflict_III)}/{conflict_all}={round(len(conflict_III)/conflict_all, 3)} \nVUS: {len(vUS_III)}/{VUS_all}={round(len(vUS_III)/VUS_all, 3)}")
+    #plt.text(9.5,-0.5, f"IV \nDots: {all_IV}/{all}={round(all_IV/all,3)}\nPathogenic: {len(path_IV)}/{path_all}={round(len(path_IV)/path_all,3)}\nBenign: {len(benign_IV)}/{benign_all}={round(len(benign_IV)/benign_all,3)}\nConflicting: {len(conflict_IV)}/{conflict_all}={round(len(conflict_IV)/conflict_all, 3)} \nVUS: {len(vUS_IV)}/{VUS_all}={round(len(vUS_IV)/VUS_all, 3)}")
+    plt.xlabel(f'\u0394\u0394G ', fontsize=17)
+    plt.ylabel(f'\u0394\u0394\u0394G ', fontsize=17)
+    path_I.to_csv('pathogenic_quadrant_I.csv', index=False)
+
+    plt.show()
+
+
+def max_plotted(ddg_cutoff,dddg_cutoff):
+    df = pd.read_csv('significant_dataframe_2.csv')
+    df = df[df['clinvar_signifiance_00']!='VUS']
+    df = df[df['score_ml'].notnull()]
+    df.reset_index(inplace=True)
+    
+    # Create quadrants based on x and y values
+    df["quadrant"] = ""
+    df.loc[(df["score_ml_max"] < ddg_cutoff) & (df["score_ml_ddg_bind_max"] >= dddg_cutoff), "quadrant"] = "I"
+    df.loc[(df["score_ml_max"] >= ddg_cutoff) & (df["score_ml_ddg_bind_max"] >= dddg_cutoff), "quadrant"] = "II"
+    df.loc[(df["score_ml_max"] < ddg_cutoff) & (df["score_ml_ddg_bind_max"] < dddg_cutoff), "quadrant"] = "III"
+    df.loc[(df["score_ml_max"] >= ddg_cutoff) & (df["score_ml_ddg_bind_max"] < dddg_cutoff), "quadrant"] = "IV"
+
+    #make specific clinical significances into their own variable
+    dfpath = df[df["clinvar_signifiance_00"]=='pathogenic']
+    dfbenign = df[df["clinvar_signifiance_00"]=='benign']
+    #dfVUS = df[df["clinvar_signifiance_00"]=='VUS']
+    dfconflict = df[df["clinvar_signifiance_00"]=='conflict']
+
+    #get the values from the rows in every quadrant
+    all_I = df["quadrant"].value_counts()["I"]
+    path_I = dfpath[dfpath["quadrant"]== "I"]
+    benign_I = dfbenign[dfbenign["quadrant"]=="I"]
+    #vUS_I = dfVUS[dfVUS["quadrant"]== "I"]
+    conflict_I = dfconflict[dfconflict["quadrant"]== "I"]
+
+    all_II = df["quadrant"].value_counts()["II"]
+    path_II = dfpath[dfpath["quadrant"]=="II"]
+    benign_II = dfbenign[dfbenign["quadrant"]== "II"]
+    #vUS_II = dfVUS[dfVUS["quadrant"]== "II"]
+    conflict_II = dfconflict[dfconflict["quadrant"]== "II"]
+
+    all_III = df["quadrant"].value_counts()["III"]
+    path_III = dfpath[dfpath["quadrant"]=="III"]
+    benign_III = dfbenign[dfbenign["quadrant"]=="III"]
+    #vUS_III = dfVUS[dfVUS["quadrant"]== "III"]
+    conflict_III = dfconflict[dfconflict["quadrant"]== "III"]
+
+    all_IV = df["quadrant"].value_counts()["IV"]
+    path_IV = dfpath[dfpath["quadrant"]=="IV"]
+    benign_IV = dfbenign[dfbenign["quadrant"]=="IV"]
+    #vUS_IV = dfVUS[dfVUS["quadrant"]== "IV"]
+    conflict_IV = dfconflict[dfconflict["quadrant"]== "IV"]
+
+    all = len(df["quadrant"])
+    path_all = len(dfpath)
+    benign_all = len(dfbenign)
+    #VUS_all = len(dfVUS)
+    conflict_all = len(dfconflict)
+
+    # Create the Seaborn jointplot
+    palette = ["#AA61E2", "#FFD700","#F46049", "#40E0D0",  "#BADA55"]
+    sns.set_palette(palette)
+    sns.set_theme(style="darkgrid", palette=palette, font="Tahoma")
+    g = sns.jointplot(data=df, x="score_ml_max", y="score_ml_ddg_bind_max", hue="clinvar_signifiance_00", alpha=.5, space=.8 )
+    #g = sns.jointplot(data=df, x="score_ml_max", y="score_ml_ddg_bind_max", hue="q_structure", alpha=.5, space=.8 )
+    g.refline(x=ddg_cutoff, y=dddg_cutoff, marginal=False)
+    g.figure.subplots_adjust(top=.9)
+    sns.move_legend(g.ax_joint, "upper center", bbox_to_anchor=(.5, 1.1), ncol=3, title="Clinical significance", fontsize=12)
+    #sns.move_legend(g.ax_joint, "upper center", bbox_to_anchor=(.5, 1.1), ncol=4, title="Quaternary structure", fontsize=12)
+    g.figure.suptitle(f'Figure 13: Scatterplot with marginals, showing the distribution of clinical variants\n across max \u0394\u0394G and max \u0394\u0394\u0394G values')
+    #g.figure.suptitle(f'Figure 14: Scatterplot with marginals, showing the distribution of clinical variants´ quaternary structure\n across max \u0394\u0394G and max \u0394\u0394\u0394G values')
+    plt.text(-3.5,3, f"I \nDots: {all_I}/{all}={round((all_I/all)*100, 2)}%\nPathogenic: {len(path_I)}/{path_all}={round((len(path_I)/path_all)*100, 2)}%\nBenign: {len(benign_I)}/{benign_all}={round((len(benign_I)/benign_all)*100, 2)}%\nConflicting: {len(conflict_I)}/{conflict_all}={round((len(conflict_I)/conflict_all)*100, 2)}%", fontsize=11)
+    plt.text(9.5,3, f"II \nDots: {all_II}/{all}={round((all_II/all)*100,2)}%\nPathogenic: {len(path_II)}/{path_all}={round((len(path_II)/path_all)*100,2)}%\nBenign: {len(benign_II)}/{benign_all}={round((len(benign_II)/benign_all)*100, 2)}%\nConflicting: {len(conflict_II)}/{conflict_all}={round((len(conflict_II)/conflict_all)*100, 2)}%",fontsize=11)
+    plt.text(-3.5,-1, f"III \nDots: {all_III}/{all}={round((all_III/all)*100, 2)}%\nPathogenic: {len(path_III)}/{path_all}={round((len(path_III)/path_all)*100,2)}%\nBenign: {len(benign_III)}/{benign_all}={round((len(benign_III)/benign_all)*100,2)}%\nConflicting: {len(conflict_III)}/{conflict_all}={round((len(conflict_III)/conflict_all)*100, 2)}%",fontsize=11) 
+    plt.text(9.5,-1, f"IV \nDots: {all_IV}/{all}={round((all_IV/all)*100,2)}%\nPathogenic: {len(path_IV)}/{path_all}={round((len(path_IV)/path_all)*100,2)}%\nBenign: {len(benign_IV)}/{benign_all}={round((len(benign_IV)/benign_all)*100,2)}%\nConflicting: {len(conflict_IV)}/{conflict_all}={round((len(conflict_IV)/conflict_all)*100, 2)}%",fontsize=11)
+    plt.xlabel(f'\u0394\u0394G ', fontsize=17)
+    plt.ylabel(f'\u0394\u0394\u0394G ', fontsize=17)
+
+    path_I.to_csv('pathogenic_quadrant_I_max.csv', index=False)
+
+    plt.show()
+
+
+def get_p_and_g_origo(gammelcsv, gammelpdbid, nycsv, nypdbid, nameofnewfile):
+    #Read the old and new csv files into their own dataframes
+    dfgammel = pd.read_csv(gammelcsv)
+    dfgammel = dfgammel[dfgammel['pdbid'] == gammelpdbid]
+    dfny = pd.read_csv(nycsv)
+    dfny = dfny[dfny['pdbid'] == nypdbid]
+
+    #Filter rows with matching 'variant' and 'chainid'
+    matching_rows = dfgammel.merge(dfny, on=['variant', 'chainid'], suffixes=('_old', '_new'))
+
+    #get only the values around origo
+    old_origo=matching_rows[matching_rows["score_ml_ddg_bind_old"].between(-0.2, 0.2)]
+    new_origo=matching_rows[matching_rows["score_ml_ddg_bind_new"].between(-0.2, 0.2)]
+
+    #collect the two dataframes with data around origo and save the dataframe as a csv file
+    origo_data = pd.concat([old_origo, new_origo], ignore_index=True).drop_duplicates()
+    origo_data.to_csv('dddg_origo_data.csv', index=False)
+
+    #read the newly made csv file into it's own dataframe
+    origo = pd.read_csv('dddg_origo_data.csv')
+
+    #pick out the mutation in the variants column, and the wild type amino acid in the variants column
+    origo["mut"] = origo["variant"].str[-1]
+    origo["wt"] = origo["variant"].str[0]
+    #Choose data from: the mutations that had proline, and choose wildtypes that had glycine 
+    proline = origo[origo["mut"]=='P']
+    glycine = origo[origo["wt"]=='G']
+
+    #concatenate the proline and glycine dataframes and save them to their own csv file
+    pg = pd.concat([proline, glycine], ignore_index=True)
+    pg.to_csv(f'{nameofnewfile}.csv', index=False)
 
 
  

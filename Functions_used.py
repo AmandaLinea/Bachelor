@@ -14,7 +14,13 @@ from Functions_code import remove_wildtype_from_csv
 from Functions_code import gathering_all_csv_files_into_one
 from Clinical_function import scatter_marginal_quadrant_plot
 from Functions_code import sequence_from_nicolas
-
+from Functions_code import write_prismfile_from_RaSP_csv
+from Functions_code import write_prismfile_from_Nicolas_csv
+from Functions_code import read_prismfiles_into_dataframe
+from Functions_code import big_dataframe_to_significant_dataframe
+from Functions_code import scatterplot_marginals_quadrant_for_significant_dataframe
+from Functions_code import max_plotted
+from Functions_code import get_p_and_g_origo
 
 '''csv file to heatmaps'''
 #toO8B = csv_to_two_heatmaps(f'Old_predictions\old_pred.csv', '2PAH', 'score_ml',chainA=True, chainB=True, chainC=False, chainD=False, show_A=True, show_B=True, show_C=False, show_D=False)
@@ -57,24 +63,24 @@ from Functions_code import sequence_from_nicolas
 
 '''old vs new data, in scatterplots'''
 #scatterplotting_old_and_new_predictions(f'clean_2PAH_df_ml.csv', '2PAH', f'clean_OPAH_df_ml.csv', 'OPAH')
-scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '2PAH', f'predictions\OPAH_df_ml.csv', 'OPAH')
+#scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '2PAH', f'predictions\OPAH_df_ml.csv', 'OPAH')
 #scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '2PAH', f'predictions\OPAH_df_ml.csv', 'OPAH')
 #
 #scatterplotting_old_and_new_predictions(f'clean_2O8B_and_5DEN_df_ml.csv', '5DEN', f'clean_OPAH_df_ml.csv', 'OPAH')
-scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '5DEN', f'predictions\OPAH_df_ml.csv', 'OPAH')
-scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '5DEN', f'predictions\OPAH_df_ml.csv', 'OPAH')
+#scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '5DEN', f'predictions\OPAH_df_ml.csv', 'OPAH')
+#scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '5DEN', f'predictions\OPAH_df_ml.csv', 'OPAH')
 #
 #scatterplotting_old_and_new_predictions(f'clean_2O8B_and_5DEN_df_ml.csv', '2O8B', f'clean_2O8B_df_ml.csv', '2O8B')
-scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '2O8B', f'_New_old_predictions\_New_old_pred.csv', '2O8B')
-scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '2O8B', f'_New_old_predictions\_New_old_pred.csv', '2O8B')
+#scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '2O8B', f'_New_old_predictions\_New_old_pred.csv', '2O8B')
+#scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '2O8B', f'_New_old_predictions\_New_old_pred.csv', '2O8B')
 #
 #scatterplotting_old_and_new_predictions(f'clean_2PAH_df_ml.csv', '2PAH', f'clean_2PAHnew_df_ml.csv', '2PAH')
-scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '2PAH', f'_New_old_predictions\_New_old_pred.csv', '2PAH')
-scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '2PAH', f'_New_old_predictions\_New_old_pred.csv', '2PAH')
+#scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '2PAH', f'_New_old_predictions\_New_old_pred.csv', '2PAH')
+#scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '2PAH', f'_New_old_predictions\_New_old_pred.csv', '2PAH')
 #
 #scatterplotting_old_and_new_predictions(f'clean_2O8B_and_5DEN_df_ml.csv', '5DEN', f'clean_5DENnew_df_ml.csv', '5DEN')
-scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '5DEN', f'_New_old_predictions\_New_old_pred.csv', '5DEN')
-scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '5DEN', f'_New_old_predictions\_New_old_pred.csv', '5DEN')
+#scatterplotting_old_vs_new_ddg_predictions(f'Old_predictions\old_pred.csv', '5DEN', f'_New_old_predictions\_New_old_pred.csv', '5DEN')
+#scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '5DEN', f'_New_old_predictions\_New_old_pred.csv', '5DEN')
 
 
 
@@ -92,10 +98,26 @@ scatterplotting_old_vs_new_dddg_predictions(f'Old_predictions\old_pred.csv', '5D
 #print(sequence_from_nicolas(f'nr2_Nicolas_data.csv', 'O95786'))
 
 
+'''Write prism files from RaSP'''
+#write_prismfile_from_RaSP_csv()
 
 
+'''Write prism files from nicolas'''
+#write_prismfile_from_Nicolas_csv()
 
 
+'''read the prismfiles into a dataframe'''
+#read_prismfiles_into_dataframe()
+
+'''Use the big dataframe with alligned variants to get a small dataframe for just the significant variants'''
+#big_dataframe_to_significant_dataframe()
+
+'''Create a scatterplot with margins for the mean stabilities'''
+#scatterplot_marginals_quadrant_for_significant_dataframe(2,0.5)
 
 
+'''Create a scatterplot with margins for the maximum stabilities'''
+#max_plotted(2,0.5)
 
+'''Get the information about the glycine substitution and proline variants'''
+#get_p_and_g_origo(f'Old_predictions\old_pred.csv', '2PAH', f'_New_old_predictions\_New_old_pred.csv', '2PAH', 'proline_glycine_2PAH_results')
